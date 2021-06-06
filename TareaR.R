@@ -36,8 +36,14 @@ sapply(Filter(is.numeric, datos), function(x) length(unique(x)))
 # Análisis datos:
 summary(datos)
 
+
+# Dibujamos el histograma de los valores de las variables.
+hist(datos$AutonomosPtge,xlab="Porcentaje Autonomos",main="")
+hist(datos$UnemploymentPtge,xlab="Porcentaje Desempleo",main="")
+
+
 "
-Tratamiento de datos atípicos:
+Correcion de errores detectados.
 "
 
 #Valores fuera de rango de la variable porcentaje de desempleo
@@ -46,13 +52,14 @@ datos$UnemploymentPtge<-replace(datos$UnemploymentPtge, which((datos$Unemploymen
 #Valores fuera de rango de la variable porcentaje de autónomos
 datos$AutonomosPtge<-replace(datos$AutonomosPtge, which((datos$AutonomosPtge < 0)|(datos$AutonomosPtge>100)), NA)
 
-#datos$varObjCont <- datos$PSOE / datos$VotosEmitidos * 100
-#datos$varObjBin <- ifelse(datos$PartidoMasVotado == "PSOE" | datos$PartidoMasVotado == "PP", 1, 0)
+
+"
+Tratamiento de datos atipicos
+"
 
 varObjCont<- datos$PSOE / datos$VotosEmitidos * 100
 varObjBin <- ifelse(datos$PartidoMasVotado == "PSOE" | datos$PartidoMasVotado == "PP", 1, 0)
 input <- as.data.frame(datos[,-(1:12)])
-#row.names(input)<-datos$ID
 
 # Eliminación de outliners.
 for (i in names(which(sapply(input, class)=="numeric"))){
@@ -60,12 +67,14 @@ for (i in names(which(sapply(input, class)=="numeric"))){
 }
 
 "
-Gestión de datos ausentes
+. Gestión de datos ausentes
+"
+"
+Creamos una nueva variable que contabiliza la proporción de variables ausentes que tiene cada observación:
 "
 
 input$prop_missings <- rowMeans(is.na(input))
 summary(input$prop_missings)
-
 (prop_missingsVars<-colMeans(is.na(input)))
 
 input[,as.vector(which(sapply(input, class)=="numeric"))]<-
@@ -76,13 +85,19 @@ input[,as.vector(which(sapply(input, class)=="factor"))]<-
 input[,as.vector(which(sapply(input, class)=="character"))] <-
   lapply(input[,as.vector(which(sapply(input, class)=="character"))] , as.factor)
 
+
+# Verificamos que la variable introducida prop_missings tiene menos de 10 valores diferentes y la convertimos en factor. 
 length(unique(input$prop_missings))
-
 input$prop_missings<-as.factor(input$prop_missings)
-freq(input$prop_missings)
 
+# Reajustamos los valores de la variable.
+freq(input$prop_missings)
 input$prop_missings<-car::recode(input$prop_missings, "c(0.0689655172413793,0.103448275862069,0.137931034482759,0.206896551724138,0.241379310344828,0.344827586206897	)='>0.068';c(0.0344827586206897)='0.034'")
 freq(input$prop_missings)
+
+"
+. Análisis de las relaciones entre variables
+"
 
 mosaico(input$PartidoCCAA,varObjBin,"PartidoCCAA")
 mosaico(input$CCAA,varObjBin,"CCAA")
@@ -99,6 +114,7 @@ input$aleatorio<-runif(nrow(input))
 input$aleatorio2<-runif(nrow(input))
 varObjBin<-as.factor(varObjBin)
 graficoVcramer(input,varObjBin) 
+graficoVcramer(input,varObjCont) 
 
 
 
@@ -111,36 +127,56 @@ graficoVcramer(input,varObjBin)
  |_____/ \___|_|\___|\___\___|_|\___/|_| |_|  \__,_|\___|   \_/ \__,_|_|  |_|\__,_|_.__/|_|\___||___/
 "
 
+
+# Creo una nueva variable a partir de los datos limpios anteriormente.
 datosNuevos<-input
+
+# Ejecutamos la funcion Transf_Auto, que selecciona la transformación que maximiza el coeficiente de correlación lineal con la variable
+# objetivo. Además eliminamos las variables aleatorias creadas anteriormente.
+
 TransfCont<-Transf_Auto(Filter(is.numeric, datosNuevos[,-c(31,32)]),varObjCont)
 names(TransfCont)
+
+"?"
 
 discCont<-droplevels(optbin(data.frame(Filter(is.numeric, datosNuevos), bin(varObjCont,nbins=5,method = "content"))))[,-(ncol(Filter(is.numeric, datosNuevos))+1)]
 
 names(discCont)<-paste("disc", names(discCont), sep = "_")
 
+# Agrupar aquellas categorías cuya frecuencia sea baja:
+  
 apply(discCont,2,freq)
 
+"Por último, unimos en un mismo dataFrame la variable objetivo y las variables input originales, transformadas
+y las discretizadas:"
 
 datos_todocont<-data.frame(varObjCont,datosNuevos,TransfCont)
 names(datos_todocont)
 
-colnames(datos_todocont)
+
+"
+  __  __           _      _             _      _                  _           
+ |  \/  |         | |    | |           | |    (_)                | |          
+ | \  / | ___   __| | ___| | ___  ___  | |     _ _ __   ___  __ _| | ___  ___ 
+ | |\/| |/ _ \ / _` |/ _ \ |/ _ \/ __| | |    | | '_ \ / _ \/ _` | |/ _ \/ __|
+ | |  | | (_) | (_| |  __/ | (_) \__ \ | |____| | | | |  __/ (_| | |  __/\__ \
+ |_|  |_|\___/ \__,_|\___|_|\___/|___/ |______|_|_| |_|\___|\__,_|_|\___||___/
+"
 
 set.seed(12345)
 trainIndex <- createDataPartition(datos_todocont$varObjCont, p=0.8, list=FALSE)
 data_train <- datos_todocont[trainIndex,]
 data_test <- datos_todocont[-trainIndex,]
 
-
-
-modeloManual<-lm(varObjCont~.,data=data_train)
-Rsq(modeloManual,"varObjCont",data_train)
-
-Rsq(modeloManual,"varObjCont",data_test)
+modelo1<-lm(varObjCont~.,data=data_train)
+Rsq(modelo1,"varObjCont",data_train)
+Rsq(modelo1,"varObjCont",data_test)
 
 modeloManual$rank
 
+"
+modeloStepAIC
+"
 
 null<-lm(varObjCont~1, data=data_train) #Modelo minimo
 full<-lm(varObjCont~., data=data_train[,c(1:30)])
@@ -149,17 +185,27 @@ modeloStepAIC<-step(null, scope=list(lower=null, upper=full), direction="both",t
 Rsq(modeloStepAIC,"varObjCont",data_test)
 modeloStepAIC$rank
 
+"
+modeloBackAIC
+"
 
 modeloBackAIC<-step(full, scope=list(lower=null, upper=full), direction="backward",
                     trace=F)
 Rsq(modeloBackAIC,"varObjCont",data_test)
 modeloBackAIC$rank
 
+"
+modeloStepBIC
+"
+
 modeloStepBIC<-step(null, scope=list(lower=null, upper=full), direction="both",
                     k=log(nrow(data_train)),trace=F)
 Rsq(modeloStepBIC,"varObjCont",data_test)
 modeloStepBIC$rank
 
+"
+modeloBackBIC
+"
 
 modeloBackBIC<-step(full, scope=list(lower=null, upper=full), direction="backward",
                     k=log(nrow(data_train)),trace=F)
@@ -171,47 +217,101 @@ modeloBackBIC$rank
 . Selección de variables con las input originales e interacciones:
 "
 
-fullInt<-lm(varObjCont~.^2, data=data_train[,c(1:30)])
-modeloStepAIC_int<-step(null, scope=list(lower=null, upper=fullInt), direction="both",
-                        trace=F)
-Rsq(modeloStepAIC_int,"varObjCont",data_test)
+
+#! modeloStepAIC_int -> No llega a funcionar
+#fullInt<-lm(varObjCont~.^2, data=data_train[,c(1:30)])
+#modeloStepAIC_int<-step(null, scope=list(lower=null, upper=fullInt), direction="both",trace=F)
+#Rsq(modeloStepAIC_int,"varObjCont",data_test)
 
 
 "
-
-  __  __           _      _         _      _                  _ 
- |  \/  |         | |    | |       | |    (_)                | |
- | \  / | ___   __| | ___| | ___   | |     _ _ __   ___  __ _| |
- | |\/| |/ _ \ / _` |/ _ \ |/ _ \  | |    | | '_ \ / _ \/ _` | |
- | |  | | (_) | (_| |  __/ | (_) | | |____| | | | |  __/ (_| | |
- |_|  |_|\___/ \__,_|\___|_|\___/  |______|_|_| |_|\___|\__,_|_|
+Puede que no funcione
+modeloStepBIC_int<-step(null, scope=list(lower=null, upper=fullInt), direction=\"both\",
+                        k=log(nrow(data_train)),trace=F)
+Rsq(modeloStepBIC_int,\"varObjCont\",data_test)
+modeloStepBIC_int$rank
 "
 
-colnames(input)
+"
+modeloStepAIC_trans
+"
+
+fullT<-lm(varObjCont~., data=data_train[,c(1:30)])
+modeloStepAIC_trans<-step(null, scope=list(lower=null, upper=fullT), direction="both"                          ,trace=F)
+Rsq(modeloStepAIC_trans,"varObjCont",data_test)
+modeloStepAIC_trans$rank
 
 
-datosModeloLineal<-data.frame(varObjCont,datosNuevos)
+"
+modeloStepBIC_trans
+"
+modeloStepBIC_trans<-step(null, scope=list(lower=null, upper=fullT), direction="both",
+                          k=log(nrow(data_train)),trace=F)
+Rsq(modeloStepBIC_trans,"varObjCont",data_test)
+modeloStepBIC_trans$rank
 
 
-colnames(datosModeloLineal)
+"
+modeloStepAIC_todo
+"
+fulltodo<-lm(varObjCont~., data=data_train)
+modeloStepAIC_todo<-step(null, scope=list(lower=null, upper=fulltodo), direction="both"
+                         ,trace=F)
+Rsq(modeloStepAIC_todo,"varObjCont",data_test)
+modeloStepAIC_todo$rank
 
-set.seed(12345)
-trainIndex <- createDataPartition(datosModeloLineal$varObjCont, p=0.8, list=FALSE)
-data_train <- datosModeloLineal[trainIndex,]
-data_test <- datosModeloLineal[-trainIndex,]
 
-modelo1<-lm(varObjCont~.,data=data_train)
-summary(modelo1)
+"
+modeloStepBIC_todo
+"
+modeloStepBIC_todo<-step(null, scope=list(lower=null, upper=fulltodo), direction="both",
+                         k=log(nrow(data_train)),trace=F)
+Rsq(modeloStepBIC_todo,"varObjCont",data_test)
+modeloStepBIC_todo$rank
 
 
-Rsq(modelo1,"varObjCont",data_train)
-Rsq(modelo1,"varObjCont",data_test)
+"
+modeloStepBIC_todoInt
+"
+fullIntT<-lm(varObjCont~.^2, data=data_train)
+modeloStepBIC_todoInt<-step(null, scope=list(lower=null, upper=fullIntT), direction="both",
+                            k=log(nrow(data_train)),trace=F)
+Rsq(modeloStepBIC_todoInt,"varObjCont",data_test)
+modeloStepBIC_todoInt$rank
 
-importanciaVariables(modelo1)
 
-modelo2<-lm(varObjCont~Clasificacion+Azucar+Etiqueta+CalifProductor+pH+Acidez+Alcohol+
-              CloruroSodico,data=data_train)
-Rsq(modelo2,"varObjCont",data_train)
+"
+Comparación de modelos de regresión lineal
+"
+
+
+modelos<-list(modelo1,modeloStepAIC,modeloStepBIC,
+              modeloStepAIC_trans,modeloStepBIC_trans,modeloStepAIC_todo,modeloStepBIC_todo,
+              modeloStepBIC_todoInt) #incluir los modelos que se desee comparar
+sapply(modelos,function(x) x$rank)
+sapply(modelos,function(x) Rsq(x,"varObjCont",data_test))
+sapply(modelos,function(x) Rsq(x,"varObjCont",data_train))
+
+total<-c()
+formulaModelos<-sapply(modelos,formula)
+for (i in 1:length(modelos)){
+  set.seed(1712)
+  vcr<-train(as.formula(formulaModelos[[i]]), data = data_train,
+             method = "lm",
+             trControl = trainControl(method="repeatedcv", number=5, repeats=20,
+                                      returnResamp="all")
+  )
+  total<-rbind(total,cbind(vcr$resample[,1:2],
+                           modelo=rep(paste("Modelo", ifelse(i<10,paste0("0",i),i)),
+                                      nrow(vcr$resample))))
+}
+boxplot(Rsquared~modelo,data=total,main="R-Square")
+axis(3, at=1:length(modelos), labels=sapply(modelos,function(x) x$rank), cex.axis=1)
+
+aggregate(Rsquared~modelo, data = total, function(x) c(mean(x), sd(x)))
+coef(modeloStepBIC_todo)
+importanciaVariables(modeloStepBIC_todo)
+
 
 
 "
@@ -235,59 +335,49 @@ data_test <- datosModeloLogistico[-trainIndex,]
 
 modeloInicial<-glm(varObjBin~.,data=datosModeloLogistico,family=binomial)
 pseudoR2(modeloInicial,data_train,"varObjBin")
-
 pseudoR2(modeloInicial,data_test,"varObjBin")
 
 modeloInicial$rank
 
 importanciaVariablesLog(modeloInicial)
 
+null<-glm(varObjBin~1,data=data_train,family=binomial)
 
-"
+#Variables input originales e interacciones
+full<-glm(varObjBin~.,data=data_train[,1:30],family=binomial)
 
-# Análisis datos:
-summary(datos)
+#Variables input originales e interacciones
+fullInt<-glm(varObjBin~.^2,data=data_train[,1:30],family=binomial)
 
-# Tratamiento de datos atípicos:
+#Variables input originales y transformadas
 
-varObjCont<-datos$PSOE / datos$VotosEmitidos * 100
+# fullT<-glm(varObjBin~.,data=data_train[,1:21],family=binomial)
 
-input<-as.data.frame(datos)
-row.names(input)<-datos$ID
+#Variables input originales, transformadas y discretizadas
+fullTodo<-glm(varObjBin~.,data=data_train,family=binomial)
 
-for (i in names(which(sapply(input, class)==\"numeric\"))){
-  outliers(paste0("input$",i))
-}
+#Variables input originales, transformadas, discretizadas e interacciones
+fullTodoInt<-glm(varObjBin~.^2,data=data_train,family=binomial)
 
-# Gestión de datos ausentes
-input$prop_missings<-rowMeans(is.na(input))
-summary(input$prop_missings)
+modeloStepBIC<-step(null, scope=list(lower=null, upper=full), direction="both",
+                    k=log(nrow(data_train)),trace=F)
 
+modeloStepBIC_int<-step(null, scope=list(lower=null, upper=fullInt), direction="both",
+                        k=log(nrow(data_train)),trace=F)
 
+#modeloStepBIC_transf<-step(null, scope=list(lower=null, upper=fullT), direction="both",
+#                           k=log(nrow(data_train)),trace=F)
 
-########################
+modeloStepBIC_todo<-step(null, scope=list(lower=null, upper=fullTodo), direction="both",
+                         k=log(nrow(data_train)),trace=F)
 
-library(caret)
-library(car)
-par(mar=c(7, 9, 4.1, 2.1))
+modeloStepBIC_todoInt<-step(null, scope=list(lower=null, upper=fullTodoInt),
+                            direction="both",k=log(nrow(data_train)),trace=F)
 
-datos$varObjCont<- datos$PSOE / datos$VotosEmitidos * 100
+modelos<-list(modeloStepBIC,
+              modeloStepBIC_int,
+              #modeloStepBIC_transf,
+              modeloStepBIC_todo,modeloStepBIC_todoInt)
 
-set.seed(12345)
-trainIndex <- createDataPartition(datos$varObjCont, p=0.8, list=FALSE)
-data_train <- datos[trainIndex,]
-data_test <- datos[-trainIndex,]
-
-#nums <- select_if(input, is.numeric)
-#round(cor(x = nums, method = pearson), 3)
-#my_data2 <- nums[, c(38, 4, 1, 2, 3)]
-#round(cor(x = my_data2, method = pearson), 3)
-#my_data2 <- nums[, c(38, 1:37)]
-
-modelo <- lm(formula = varObjCont ~VotosEmitidos + Abstenciones+Blancos+Nulos+Cs+PP+PSOE+VOX+Podemos+Otros+Censo+Population+PartidoMasVotado, data = datos)
-summary(modelo)
-importanciaVariables(modelo)
-
-step(object = modelo, direction = both, trace = 1)
-"
+sapply(modelos,function(x) pseudoR2(x,data_test,"varObjBin"))
 
