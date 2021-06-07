@@ -139,7 +139,9 @@ names(TransfCont)
 
 "?"
 
-discCont<-droplevels(optbin(data.frame(Filter(is.numeric, datosNuevos), bin(varObjCont,nbins=5,method = "content"))))[,-(ncol(Filter(is.numeric, datosNuevos))+1)]
+ncol(datosNuevos)
+
+discCont<-droplevels(optbin(data.frame(Filter(is.numeric, datosNuevos[,-c(31,32)]), bin(varObjCont,nbins=5,method = "content"))))[,-(ncol(Filter(is.numeric, datosNuevos[,-c(31,32)]))+1)]
 
 names(discCont)<-paste("disc", names(discCont), sep = "_")
 
@@ -147,10 +149,45 @@ names(discCont)<-paste("disc", names(discCont), sep = "_")
   
 apply(discCont,2,freq)
 
+aggregate(varObjCont, by=list(discCont$disc_Age_under19_Ptge), mean)
+
+discCont$disc_Age_under19_Ptge<-car::recode(discCont$disc_Age_under19_Ptge,
+                                        "c('(12.5,13.4]','(13.4,14]')='(12.5,14]'")
+
+discCont$disc_Age_over65_Ptge<-car::recode(discCont$disc_Age_over65_Ptge,
+                                        "c('(28.3,29.4]','(29.4,30.8]')='(28.3,30.8]'")
+
+discCont$disc_ForeignersPtge<-car::recode(discCont$disc_ForeignersPtge,
+                                           "c('(5.41,6.09]','(6.09,6.35]')='(5.41,6.35]'")
+
+discCont$disc_totalEmpresas<-car::recode(discCont$disc_totalEmpresas,
+                                          "c('(306,434]','(434,487]')='(306,487]'")
+
+discCont$disc_IndustriaPtge<-car::recode(discCont$disc_IndustriaPtge,
+                                         "c('(2.51,3.23]','(3.23,3.83]','(3.83,4.35]')='(2.51,4.35]'")
+
+discCont$disc_ConstruccionPtge<-car::recode(discCont$disc_ConstruccionPtge,
+                                         "c('(5.31,6.19]','(6.19,7.46]')='(5.31,7.46]'")
+
+discCont$disc_ServiciosPtge<-car::recode(discCont$disc_ServiciosPtge,
+                                         "c('(10.3,11.4]','(11.4,12.9]','(12.9,13.9]')='(10.3,13.9]'")
+
+discCont$disc_PersonasInmueble<-car::recode(discCont$disc_PersonasInmueble,
+                                            "c('(1.21,1.27]','(1.27,1.31]')='(1.21,1.31]'")
+
+discCont$disc_WomenUnemploymentPtge<-car::recode(discCont$disc_WomenUnemploymentPtge,
+                                            "c('(50.6,53.4]','(53.4,53.7]')='(50.6,53.7]'")
+
+discCont$disc_UnemployMore40_Ptge<-car::recode(discCont$disc_UnemployMore40_Ptge,
+                                            "c('(50.6,53.4]','(53.4,53.7]')='(50.6,53.7]'")
+
+discCont$disc_ServicesUnemploymentPtge<-car::recode(discCont$disc_ServicesUnemploymentPtge,
+                                               "c('(61.8,62.2]','(62.2,63.9]')='(61.8,63.9]'")
+
 "Por último, unimos en un mismo dataFrame la variable objetivo y las variables input originales, transformadas
 y las discretizadas:"
 
-datos_todocont<-data.frame(varObjCont,datosNuevos,TransfCont)
+datos_todocont<-data.frame(varObjCont,datosNuevos,TransfCont,discCont)
 names(datos_todocont)
 
 
@@ -172,7 +209,7 @@ modelo1<-lm(varObjCont~.,data=data_train)
 Rsq(modelo1,"varObjCont",data_train)
 Rsq(modelo1,"varObjCont",data_test)
 
-modeloManual$rank
+modelo1$rank
 
 "
 modeloStepAIC
