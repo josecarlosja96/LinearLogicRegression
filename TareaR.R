@@ -137,10 +137,6 @@ datosNuevos<-input
 TransfCont<-Transf_Auto(Filter(is.numeric, datosNuevos[,-c(31,32)]),varObjCont)
 names(TransfCont)
 
-"?"
-
-ncol(datosNuevos)
-
 discCont<-droplevels(optbin(data.frame(Filter(is.numeric, datosNuevos[,-c(31,32)]), bin(varObjCont,nbins=5,method = "content"))))[,-(ncol(Filter(is.numeric, datosNuevos[,-c(31,32)]))+1)]
 
 names(discCont)<-paste("disc", names(discCont), sep = "_")
@@ -362,21 +358,38 @@ importanciaVariables(modeloStepBIC_todo)
                                             |___/                      
 
 "
+colnames(datosModeloLogistico[,-c(31,32)])
 
-datosModeloLogistico<-data.frame(varObjBin,datosNuevos)
+datosModeloLogistico<-datosNuevos
+
+colnames(datosNuevos)
+
+Transfbin<-Transf_Auto(Filter(is.numeric, datosModeloLogistico[,-c(31,32)]),varObjBin)
+names(Transfbin)
+
+
+discbin<-droplevels(optbin(data.frame(Filter(is.numeric,datosModeloLogistico[,-c(31,32)]),varObjBin)))[,
+          -(ncol(Filter(is.numeric, datosModeloLogistico[,-c(31,32)]))+1)]
+
+apply(discbin,2,freq) #todas están bien representadas
+
+datos_todobin<-data.frame(varObjBin,datosModeloLogistico,Transfbin,discbin)
 
 set.seed(12345)
-trainIndex <- createDataPartition(datosModeloLogistico$varObjBin, p=0.8, list=FALSE)
-data_train <- datosModeloLogistico[trainIndex,]
-data_test <- datosModeloLogistico[-trainIndex,]
+trainIndex <- createDataPartition(varObjBin, p=0.8, list=FALSE)
+data_train <- datos_todobin[trainIndex,]
+data_test <- datos_todobin[-trainIndex,]
 
-modeloInicial<-glm(varObjBin~.,data=datosModeloLogistico,family=binomial)
+colnames(data_train)
+
+modeloInicial<-glm(varObjBin~.,data=data_train[1:31],family=binomial)
 pseudoR2(modeloInicial,data_train,"varObjBin")
 pseudoR2(modeloInicial,data_test,"varObjBin")
 
 modeloInicial$rank
 
-importanciaVariablesLog(modeloInicial)
+importanciaVariables(modeloInicial)
+Log(modeloInicial)
 
 null<-glm(varObjBin~1,data=data_train,family=binomial)
 
